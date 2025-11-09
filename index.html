@@ -7,7 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #f9fafc;
+            --bg-gradient-light: linear-gradient(135deg, #f0f4ff 0%, #f9fafc 100%);
+            --bg-gradient-dark: linear-gradient(135deg, #0b1122 0%, #0f172a 100%);
             --card-bg: #ffffff;
             --text: #2d3748;
             --text-light: #718096;
@@ -20,7 +21,6 @@
             --shadow-hover: 0 8px 20px rgba(0,0,0,0.08);
         }
         [data-theme="dark"] {
-            --bg: #0f172a;
             --card-bg: #1e293b;
             --text: #e2e8f0;
             --text-light: #94a3b8;
@@ -36,12 +36,17 @@
         }
 
         body {
-            background-color: var(--bg);
+            background: var(--bg-gradient-light);
+            background-attachment: fixed;
             color: var(--text);
             font-family: 'Vazirmatn', Tahoma, sans-serif;
             padding: 20px;
-            transition: background-color 0.4s ease, color 0.4s ease;
+            transition: background 0.6s ease, color 0.4s ease;
             line-height: 1.6;
+        }
+
+        [data-theme="dark"] body {
+            background: var(--bg-gradient-dark);
         }
 
         .logo-header {
@@ -372,7 +377,6 @@
         localStorage.setItem('lang', lang);
         const t = translations[lang];
 
-       
         document.getElementById('title').innerHTML = t.title;
         document.getElementById('subtitle').textContent = t.subtitle;
         document.getElementById('infoNote').innerHTML = t.infoNote;
@@ -382,7 +386,6 @@
         document.getElementById('ageLabel').textContent = t.ageLabel;
         document.getElementById('dpfLabel').textContent = t.dpfLabel;
         document.getElementById('predictBtn').textContent = t.predictBtn;
-      
         document.getElementById('footer').innerHTML = t.footer;
         langToggle.innerHTML = t.langToggleText;
 
@@ -440,7 +443,7 @@
         setTheme(newTheme);
     });
 
-  
+    // --- Predict Button ---
     document.getElementById('predictBtn').addEventListener('click', () => {
         const glucose = parseFloat(document.getElementById('glucose').value);
         const bmi = parseFloat(document.getElementById('bmi').value);
@@ -448,17 +451,71 @@
         const age = parseFloat(document.getElementById('age').value);
         const dpf = parseFloat(document.getElementById('dpf').value);
 
+        // Basic validation: non-number inputs
         if ([glucose, bmi, bp, age, dpf].some(isNaN)) {
             alert(translations[currentLang].alertInvalid);
             return;
         }
 
+        // === ✅ Clinical plausibility validation (added) ===
+        const alerts = [];
+
+        if (glucose < 20) alerts.push(currentLang === 'fa' 
+            ? 'گلوکز واردشده بسیار پایین است (زیر ۲۰ mg/dL) — ممکن است اشتباه ورودی باشد.' 
+            : 'Glucose is extremely low (<20 mg/dL) — likely input error.');
+        if (glucose > 600) alerts.push(currentLang === 'fa' 
+            ? 'گلوکز واردشده بسیار بالا است (بالای ۶۰۰ mg/dL) — لطفاً بررسی کنید.' 
+            : 'Glucose is extremely high (>600 mg/dL) — please verify.');
+
+        if (bmi < 10) alerts.push(currentLang === 'fa' 
+            ? 'BMI واردشده غیرقابل‌تصور است (زیر ۱۰) — ممکن است وزن یا قد اشتباه وارد شده باشد.' 
+            : 'BMI is unrealistically low (<10) — check height/weight input.');
+        if (bmi > 90) alerts.push(currentLang === 'fa' 
+            ? 'BMI واردشده بسیار غیرمعمول است (بالای ۹۰) — لطفاً داده‌ها را دوباره وارد کنید.' 
+            : 'BMI is extremely high (>90) — please double-check inputs.');
+
+        if (bp < 10) alerts.push(currentLang === 'fa' 
+            ? 'فشار خون واردشده خیلی پایین است (زیر ۱۰ mmHg) — احتمالاً اشتباه است.' 
+            : 'Blood pressure is critically low (<10 mmHg) — likely invalid.');
+        if (bp > 300) alerts.push(currentLang === 'fa' 
+            ? 'فشار خون واردشده خیلی بالا است (بالای ۳۰۰ mmHg) — غیرمعمول در انسان.' 
+            : 'Blood pressure is extremely high (>300 mmHg) — biologically implausible.');
+
+        if (age < 1) alerts.push(currentLang === 'fa' 
+            ? 'سن نمی‌تواند کمتر از ۱ سال باشد.' 
+            : 'Age cannot be less than 1 year.');
+        if (age > 120) alerts.push(currentLang === 'fa' 
+            ? 'سن بالای ۱۲۰ سال غیرمعمول است — لطفاً بررسی کنید.' 
+            : 'Age >120 is highly unusual — please verify.');
+
+        if (dpf < 0) alerts.push(currentLang === 'fa' 
+            ? 'تابع سابقه دیابت نمی‌تواند منفی باشد.' 
+            : 'DPF cannot be negative.');
+        if (dpf > 3) alerts.push(currentLang === 'fa' 
+            ? 'DPF بالای ۳ بسیار نادر است — ممکن است اشتباه باشد.' 
+            : 'DPF >3 is extremely rare — double-check input.');
+
+        if (alerts.length > 0) {
+            const t = translations[currentLang];
+            const title = currentLang === 'fa' ? '⚠️ هشدار بالینی' : '⚠️ Clinical Warning';
+            const confirmMsg = currentLang === 'fa' 
+                ? 'مقادیر واردشده خارج از محدودهٔ قابل‌انتظار برای انسان هستند.\n' +
+                  'آیا می‌خواهید با این مقادیر ادامه دهید؟\n\n• ' + alerts.join('\n• ') 
+                : 'Some values are outside biologically plausible ranges.\n' +
+                  'Do you want to proceed anyway?\n\n• ' + alerts.join('\n• ');
+
+            if (!confirm(`${title}\n\n${confirmMsg}`)) {
+                return; // Cancel if user clicks "Cancel"
+            }
+        }
+
+        // Save inputs
         ['glucose', 'bmi', 'bp', 'age', 'dpf'].forEach(id => {
             localStorage.setItem(`input_${id}_${currentLang}`, document.getElementById(id).value);
         });
 
+        // --- Rule-based prediction (unchanged) ---
         let pred = 0;
-        
         let ruleDesc = currentLang === 'fa' 
             ? 'پیش‌فرض سیستم: شرایط خاصی تشخیص داده نشد' 
             : 'System default: No specific rule matched';
@@ -494,7 +551,6 @@
 
         const t = translations[currentLang];
         const basedOnText = currentLang === 'fa' ? 'طبق' : 'Based on';
-        // ✅ حالا ruleDesc همیشه مقدار داره — undefined نمیشه
         box.innerHTML = pred === 1 ?
             `<span style="font-size:2.1rem">⚠️ ${t.resultYes}</span><br>
              <small>${basedOnText}: ${ruleDesc}</small>
@@ -509,6 +565,6 @@
 
         box.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-</script>
+    </script>
 </body>
 </html>
